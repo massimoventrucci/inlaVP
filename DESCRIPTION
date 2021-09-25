@@ -1,0 +1,17 @@
+Package: inlaVP
+Type: Package
+Title: Variance Partitioning disease mapping models
+Version: 0.1.0
+Authors@R: c(
+  person(given = "Massimo", family = "Ventrucci", email = "massimo.ventrucci@unibo.it", role = c("aut", "cre")),
+  person(given = "Maria", family = "Franco-Villoria", email = "maria.francovilloria@unimore.it", role = c("aut")))
+Maintainer: Massimo Ventrucci <massimo.ventrucci@unibo.it>
+Description: This package contains functions to fit Variance Partiotioning (VP) 
+    disease mapping models in R-INLA; the models are described in the paper by Franco-Villoria M, Ventrucci M, Rue H. 
+    'Variance partitioning in spatio-temporal disease mapping models'. submitted  
+License: GPL
+Encoding: UTF-8
+Depends: R (>= 3.5.0)
+Suggests: INLA
+Imports: Matrix, numDeriv
+LazyData: true
