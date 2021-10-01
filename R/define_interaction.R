@@ -93,20 +93,24 @@ m <- function(x, igmrf.type = "rw1", R=NULL, g,
         idx <- 1:ncol(A)
         R <- Qrw1(idx)
         rankdef <- 1
+        cc.id <- NULL
       } else {
         idx <- 1:ncol(A)
         rankdef <- 1
+        cc.id <- NULL
       }
     } else if (igmrf.type == "rw2"){
       if (is.null(R)){
         idx <- 1:ncol(A)
         R <- Qrw2(idx)
         rankdef <- 2
+        cc.id <- NULL
       } else {
         idx <- 1:ncol(A)
         rankdef <- 2
+        cc.id <- NULL
       }
-    }
+    } else stop("p-spline can only be set for igmrf.type = 'rw1' or 'rw2'")
   } else {
     # SPDE RW case in Lindgren and Rue paper (approx equivalent to thin-plate spline for rw2)
     idx <- define.id(x)
@@ -115,15 +119,19 @@ m <- function(x, igmrf.type = "rw1", R=NULL, g,
       if (is.null(R)){
         R <- Qrw1(x)
         rankdef <- 1
+        cc.id <- NULL
       } else {
         rankdef <- 1
+        cc.id <- NULL
       }
     } else if (igmrf.type == "rw2"){
       if (is.null(R)){
         R <- Qrw2(x)
         rankdef <- 2
+        cc.id <- NULL
       } else {
         rankdef <- 2
+        cc.id <- NULL
       }
     } else if (igmrf.type == "besag") {
       if (is.null(R)){
@@ -135,10 +143,12 @@ m <- function(x, igmrf.type = "rw1", R=NULL, g,
                                       A = matrix(1, 1, nrow(graph.mat)),
                                       e=0))
         rankdef <- 1
+        cc.id <- g$cc$id
       } else {
         rankdef <- 1
+        cc.id <- NULL
       }
-    }
+    }  else stop("igmrf.type not supported; it can only be 'rw1', 'rw2' or 'besag'")
   }
 
   # output list
@@ -146,10 +156,22 @@ m <- function(x, igmrf.type = "rw1", R=NULL, g,
               R=R,
               rankdef=rankdef,
               id = idx,
-              A = A))
+              A = A,
+              cc.id = cc.id))
 }
 
 control.interaction <- function(m1, m2, interaction.type=4){
+
+  # utilities
+  inlaVP.model.matrix <- function(x){
+    X <- matrix(0, nrow = length(x), ncol=length(unique(x)))
+    for(i in 1:nrow(X)){
+      X[i,x[i]] <- 1
+    }
+    X
+  }
+  # end utilities
+
   R1 <- m1$R
   R2 <- m2$R
   n1 <- ncol(R1)
@@ -157,34 +179,61 @@ control.interaction <- function(m1, m2, interaction.type=4){
   A1 <- m1$A
   A2 <- m2$A
   A.int <- INLA::inla.row.kron(M1=A2, M2=A1)
-  Identity <- Matrix:::Diagonal(n1*n2, x = 1)
-  Id1 = Matrix:::Diagonal(n1, x = 1)
-  Id2 = Matrix:::Diagonal(n2, x = 1)
-  Kbeta1 <- kronecker(Matrix:::Matrix(1,nrow=n2),Matrix:::Diagonal(n1))
-  Kbeta2 <- kronecker(Matrix:::Diagonal(n2), Matrix:::Matrix(1,nrow=n1))
-  f2.inter.const <- kronecker(matrix(1,ncol=n2),diag(n1))
-  f1.inter.const <- kronecker(diag(n2),matrix(1,ncol=n1))
-  # f2.inter.const <- kronecker(matrix(1,ncol=n2), Matrix:::Diagonal(n1))
-  # f1.inter.const <- kronecker(Matrix:::Diagonal(n2),matrix(1,ncol=n1))
-  if (interaction.type==4){
-    Rkron <- kronecker(R2, R1)
-    constr <- list(A=rbind(f1.inter.const,
-                           f2.inter.const[-1,]),
-                   e=matrix(0, n1+n2-1,1))
-  } else if (interaction.type==3){  # spatial trend changes at each time
-    Rkron <- kronecker(R2, Matrix:::Diagonal(n1))
-    constr <- list(A=rbind(f2.inter.const),
-                             e=matrix(0, n1,1))
+  #### old bit; this was used for the augmented approach
+  # Identity <- Matrix:::Diagonal(n1*n2, x = 1)
+  # Id1 = Matrix:::Diagonal(n1, x = 1)
+  # Id2 = Matrix:::Diagonal(n2, x = 1)
+  # Kbeta1 <- kronecker(Matrix:::Matrix(1,nrow=n2),Matrix:::Diagonal(n1))
+  # Kbeta2 <- kronecker(Matrix:::Diagonal(n2), Matrix:::Matrix(1,nrow=n1))
+  ####
+  if (is.null(m2$cc.id)) {
+    # if m2$cc.id=NULL either m2 is an ICAR with a fully connected graph or m2 is a rw
+    f2.inter.const <- kronecker(matrix(1,ncol=n2),diag(n1)) # for each time point, sum-to-zero over space locations
+    f1.inter.const <- kronecker(diag(n2),matrix(1,ncol=n1)) # for each space location, sum-to-zero over time points
+    if (interaction.type==4){
+      Rkron <- kronecker(R2, R1)
+      constr <- list(A=rbind(f1.inter.const,
+                             f2.inter.const[-1,]),
+                     e=matrix(0, n1+n2-1,1))
+    } else if (interaction.type==3){  # spatial trend changes at each time
+      Rkron <- kronecker(R2, Matrix:::Diagonal(n1))
+      constr <- list(A=rbind(f2.inter.const),
+                     e=matrix(0, n1,1))
 
-  } else if (interaction.type==2){  # time trend changes at each space
-    Rkron <- kronecker(Matrix:::Diagonal(n2), R1)
-    constr <- list(A=rbind(f1.inter.const),
-                             e=matrix(0, n2,1))
-  } else{
-    Rkron <- kronecker(Matrix:::Diagonal(n2), Matrix:::Diagonal(n1))
-    constr <- NULL
+    } else if (interaction.type==2){  # time trend changes at each space
+      Rkron <- kronecker(Matrix:::Diagonal(n2), R1)
+      constr <- list(A=rbind(f1.inter.const),
+                     e=matrix(0, n2,1))
+    } else{
+      Rkron <- kronecker(Matrix:::Diagonal(n2), Matrix:::Diagonal(n1))
+      constr <- NULL
+    }
+  } else {  # m2 is an ICAR with disconnected graph (more than 1 cc, singletons are NOT accounted for yet)
+    # seq.cc <- unique(m2$cc.id)
+    # id.spatconstr.remove <- c(1, which(diff(m2$cc.id) == 1) + 1)
+    f2.inter.const <- kronecker(t(inlaVP.model.matrix(m2$cc.id)), diag(c(rep(1,n1-1),0))) # for each time point, sum-to-zero over space locations
+    f1.inter.const <- kronecker(diag(n2), matrix(1,ncol=n1)) # for each space location, sum-to-zero over time points
+    if (interaction.type==4){
+      Rkron <- kronecker(R2, R1)
+      constr <- list(A=rbind(f1.inter.const,
+                             f2.inter.const[-which(apply(f2.inter.const,1,sum)==0),]),
+                     e=matrix(0, nrow(f1.inter.const)+
+                                nrow(f2.inter.const[-which(apply(f2.inter.const,1,sum)==0),]), 1))
+    } else stop("with a disconnected graph, interactions other than type IV are not implemented")
   }
-  return(list(n1=n1, n2=n2, R1=R1, R2=R2, Rkron=Rkron, constr=constr,
-              A1=A1, A2=A2, A.int=A.int, n=nrow(A.int),
-              Identity=Identity, Id1=Id1, Id2=Id2, Kbeta1=Kbeta1, Kbeta2=Kbeta2))
+     # f1.inter.const and f2.inter.const assume that the data is structrued as:
+     # id.space indices and id.time indices are ordered increasingly,
+     # with id time running faster; as a consequence id.int is also increasing
+     # id.int=1: id.space=1, id.time=1
+     # id.int=2: id.space=1, id.time=2
+     # ....
+     # and also there must not be any gaps; so, we suggest to use id.space and id.time with no missing
+     # values; if data are not available for some
+     # combination of id.space and id.time just put NA in the y vector
+     # finally, the constr for the interaction in the disconnected graph case need to be checked
+     # I still need to take care of singletons
+
+    return(list(n1=n1, n2=n2, R1=R1, R2=R2, Rkron=Rkron, constr=constr,
+              #Identity=Identity, Id1=Id1, Id2=Id2, Kbeta1=Kbeta1, Kbeta2=Kbeta2,
+              A1=A1, A2=A2, A.int=A.int, n=nrow(A.int)))
 }

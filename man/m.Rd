@@ -1,7 +1,7 @@
 \name{m}
 \alias{m}
 %- Also NEED an '\alias' for EACH other topic documented here.
-\title{Define the IGMRF model on the main effects (it builds the structure matrix)}
+\title{Define the IGMRF for the main effects}
 \description{
 This function is intended for internal use, its output is taken in input by control.interaction().}
 \usage{
@@ -10,7 +10,7 @@ m(x, igmrf.type = "rw1", R = NULL, g, p.spline = FALSE, n.bsplines = 20, deg.bsp
 %- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{x}{
-a vector of increasing integer values indicating time or spatial locations (for a temporal main effect, it can be a vector of not equally spaced time locations)
+vector of covariate values; it can either be a vector of the same length of the data or a vector containing the unique covariate values; typically, it is a vector of increasing integers indexing time points or spatial locations (for time main effect, it can also be a vector of not equally spaced time locations)
 }
   \item{igmrf.type}{
 the main effect model, e.g. "rw2", "besag"
@@ -35,7 +35,23 @@ experimental; only for p.spline=TRUE, degree of the b-splines (default is 3, cub
 %%  ~~ If necessary, more details than the description above ~~
 }
 \value{
-TO DO}
+A list of several objects
+\item{R}{
+the structure matrix of the IGMRF
+}
+\item{rankdef}{
+rank deficiency of the structure matrix
+}
+\item{idx}{
+a vector of length(x) indicating the ordering of the covariate vector x (OBSOLETE; when the dataset is properly ordered - as it has to be for the package to work fine - idx is not needed)
+}
+\item{A}{
+experimental; the B-spline desgin amtrix (need to check if this works)
+}
+\item{cc.id}{
+a vector indicating which cc a node belongs to (if igmrf.type="besag"); NULL id igmrf.type="rw1" or "rw2"
+}
+}
 \references{
 %% ~put references to the literature/web site here ~
 }
