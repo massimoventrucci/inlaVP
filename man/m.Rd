@@ -1,16 +1,16 @@
 \name{m}
 \alias{m}
 %- Also NEED an '\alias' for EACH other topic documented here.
-\title{Define the IGMRF for the main effects}
+\title{Define the IGMRF model assumed on a main effect (e.g. space or time)}
 \description{
-This function is intended for internal use, its output is taken in input by control.interaction().}
+The output of this function is often used as an input for the function control.interaction().}
 \usage{
 m(x, igmrf.type = "rw1", R = NULL, g, p.spline = FALSE, n.bsplines = 20, deg.bsplines = 3)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{x}{
-vector of covariate values; it can either be a vector of the same length of the data or a vector containing the unique covariate values; typically, it is a vector of increasing integers indexing time points or spatial locations (for time main effect, it can also be a vector of not equally spaced time locations)
+vector of covariate values; it can be either a vector of the same length of the data or a vector containing the unique covariate values; typically, it is a vector of increasing integers indexing time points or spatial locations (for time main effect, it can also be a vector of not equally spaced time locations)
 }
   \item{igmrf.type}{
 the main effect model, e.g. "rw2", "besag"

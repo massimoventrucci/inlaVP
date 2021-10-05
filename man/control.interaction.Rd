@@ -17,7 +17,7 @@ temporal main effect; it is the output of function m()
 spatial main effect; it is the output of function m()
 }
   \item{interaction.type}{
-a number from 1 to 4 (the value 'none', which specifies the additive model, is experimental)
+a number from 1 to 4, indicating the interaction type as specified in Knorr-Held, L. (2000). The value 'none', which specifies the additive model, is experimental)
 }
 }
 \details{
@@ -27,7 +27,7 @@ a number from 1 to 4 (the value 'none', which specifies the additive model, is e
 A list of several objects, the most useful are 'Rkron' the structure matrix of the Kronecker product IGMRF for the interaction model, and 'constr' the constraints for the interaction random effects to pass on to inla.
 }
 \references{
-%% ~put references to the literature/web site here ~
+Knorr-Held, L. (2000). Bayesian modelling of inseparable space-time variation in disease risk. Statistics in Medicine, 19(1718):2555–2567.
 }
 \author{
 %%  ~~who you are~~
