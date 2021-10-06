@@ -73,6 +73,20 @@ m <- function(x, igmrf.type = "rw1", R=NULL, g,
     return(Qrw)
   }
 
+  Qbesag <- function(x, graph){
+    xx <- sort(unique(x))
+    n <- length(xx)
+    Q <- INLA:::inla.extract.Q("xx", y ~ f(xx,
+                                           model="besag",
+                                           graph=graph,
+                                           scale.model=TRUE,
+                                           adjust.for.con.comp =TRUE,
+                                           initial=0, diagonal = 0,
+                                           fixed=TRUE),
+                               data = data.frame(xx, y = rep(0, n)))
+    return(Q)
+  }
+
   bspline <- function(x, xl=min(x), xr=max(x), ndx, bdeg) {
     dx <- (xr - xl) / ndx
     knots <- seq(xl - bdeg * dx, xr + bdeg * dx, by = dx)
@@ -89,65 +103,42 @@ m <- function(x, igmrf.type = "rw1", R=NULL, g,
     # P-spline case; only for rw1 and rw2 not besag
     A <- bspline(x=x, ndx=n.bsplines-3, bdeg=deg.bsplines)
     if (igmrf.type == "rw1") {
-      if (is.null(R)){
-        idx <- 1:ncol(A)
-        R <- Qrw1(idx)
-        rankdef <- 1
-        cc.id <- NULL
-      } else {
-        idx <- 1:ncol(A)
-        rankdef <- 1
-        cc.id <- NULL
-      }
+      idx <- 1:ncol(A)
+      R <- Qrw1(idx)
+      rankdef <- 1
+      cc.id <- NULL
     } else if (igmrf.type == "rw2"){
-      if (is.null(R)){
-        idx <- 1:ncol(A)
-        R <- Qrw2(idx)
-        rankdef <- 2
-        cc.id <- NULL
-      } else {
-        idx <- 1:ncol(A)
-        rankdef <- 2
-        cc.id <- NULL
-      }
+      idx <- 1:ncol(A)
+      R <- Qrw2(idx)
+      rankdef <- 2
+      cc.id <- NULL
     } else stop("p-spline can only be set for igmrf.type = 'rw1' or 'rw2'")
   } else {
     # SPDE RW case in Lindgren and Rue paper (approx equivalent to thin-plate spline for rw2)
     idx <- define.id(x)
     A <- build.A(id=idx, n=length(x), p=length(unique(x)))
     if (igmrf.type == "rw1") {
-      if (is.null(R)){
-        R <- Qrw1(x)
-        rankdef <- 1
-        cc.id <- NULL
-      } else {
-        rankdef <- 1
-        cc.id <- NULL
-      }
+      R <- Qrw1(x)
+      rankdef <- 1
+      cc.id <- NULL
     } else if (igmrf.type == "rw2"){
-      if (is.null(R)){
-        R <- Qrw2(x)
-        rankdef <- 2
-        cc.id <- NULL
-      } else {
-        rankdef <- 2
-        cc.id <- NULL
-      }
+      R <- Qrw2(x)
+      rankdef <- 2
+      cc.id <- NULL
     } else if (igmrf.type == "besag") {
-      if (is.null(R)){
-        graph.mat <- INLA::inla.as.sparse(INLA::inla.graph2matrix(g))
-        R.tmp <- -graph.mat
-        diag(R.tmp) <- apply(graph.mat,1,sum)-1
-        R <- INLA::inla.scale.model(R.tmp,
-                                    constr = list(
-                                      A = matrix(1, 1, nrow(graph.mat)),
-                                      e=0))
-        rankdef <- 1
-        cc.id <- g$cc$id
-      } else {
-        rankdef <- 1
-        cc.id <- NULL
-      }
+      # old
+      # graph.mat <- INLA::inla.as.sparse(INLA::inla.graph2matrix(g))
+      # R.tmp <- -graph.mat
+      # diag(R.tmp) <- apply(graph.mat,1,sum)-1
+      # R <- INLA::inla.scale.model(R.tmp,
+      #                             constr = list(
+      #                               A = matrix(1, 1, nrow(graph.mat)),
+      #                               e=0))
+      # rankdef <- 1
+      # END old
+      R <- Qbesag(x=x, graph=g)
+      rankdef <- g$cc$n - sum(table(g$cc$id)==1) # rankdef should be the number of cc with size>1, but ask to H
+      cc.id <- g$cc$id
     }  else stop("igmrf.type not supported; it can only be 'rw1', 'rw2' or 'besag'")
   }
 
@@ -191,7 +182,6 @@ control.interaction <- function(m1, m2, interaction.type){
 
 
 constr.interaction <- function(m1, m2, interaction.type){
-
   # NOTES:
   # f1.inter.const and f2.inter.const assume that the data is structrued as:
   # id.space indices and id.time indices are ordered increasingly,
@@ -206,7 +196,7 @@ constr.interaction <- function(m1, m2, interaction.type){
   # I still need to take care of singletons
 
   # utilities
-  inlaVP.model.matrix <- function(x){
+  expand.cc <- function(x){
     X <- matrix(0, nrow = length(x), ncol=length(unique(x)))
     for(i in 1:nrow(X)){
       X[i,x[i]] <- 1
@@ -237,16 +227,23 @@ constr.interaction <- function(m1, m2, interaction.type){
     }
   } else {
     # m2 is ICAR with disconnected graph (singletons NOT accounted for yet)
-    f2.inter.const <- kronecker(t(inlaVP.model.matrix(m2$cc.id)), diag(c(rep(1,n1-1),0)))
+    #f2.inter.const <- kronecker(t(expand.cc(m2$cc.id)), diag(n1))
+    f2.inter.const <- kronecker(t(expand.cc(m2$cc.id)), diag(c(rep(1,n1-1),0)))
     f1.inter.const <- kronecker(diag(n2), matrix(1,ncol=n1))
     if (interaction.type==4){
       constr <- list(A=rbind(f1.inter.const,
-                             f2.inter.const[-which(apply(f2.inter.const,1,sum)==0),]),
+                             f2.inter.const[apply(f2.inter.const,1,sum)>0,]),
                      e=matrix(0, nrow(f1.inter.const)+
-                                nrow(f2.inter.const[-which(apply(f2.inter.const,1,sum)==0),]), 1))
+                                nrow(f2.inter.const[apply(f2.inter.const,1,sum)>0,]), 1))
+      # constr <- list(A=rbind(f1.inter.const,
+      #                        f2.inter.const),
+      #                e=matrix(0, nrow(f1.inter.const)+
+      #                           nrow(f2.inter.const), 1))
     } else if (interaction.type==3){
-      constr <- list(A=f2.inter.const[-which(apply(f2.inter.const,1,sum)==0),],
-                     e=matrix(0, nrow(f2.inter.const[-which(apply(f2.inter.const,1,sum)==0),]), 1))
+      constr <- list(A=f2.inter.const[apply(f2.inter.const,1,sum)>0,],
+                     e=matrix(0, nrow(f2.inter.const[apply(f2.inter.const,1,sum)>0,]), 1))
+      # constr <- list(A=f2.inter.const,
+      #                e=matrix(0, nrow(f2.inter.const), 1))
     } else if (interaction.type==2){
       constr <- list(A=f1.inter.const,
                      e=matrix(0, n2, 1))

@@ -8,7 +8,7 @@ Authors@R: c(
 Maintainer: Massimo Ventrucci <massimo.ventrucci@unibo.it>
 Description: This package contains functions to fit Variance Partiotioning (VP) 
     disease mapping models in R-INLA; the models are described in the paper by Franco-Villoria M, Ventrucci M, Rue H. 
-    'Variance partitioning in spatio-temporal disease mapping models'. submitted  
+    'Variance partitioning in spatio-temporal disease mapping models'. arXiv:2109.13374
 License: GPL
 Encoding: UTF-8
 Depends: R (>= 3.5.0)
