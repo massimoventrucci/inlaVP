@@ -137,7 +137,7 @@ m <- function(x, igmrf.type = "rw1", R=NULL, g,
       # rankdef <- 1
       # END old
       R <- Qbesag(x=x, graph=g)
-      rankdef <- g$cc$n - sum(table(g$cc$id)==1) # rankdef should be the number of cc with size>1, but ask to H
+      rankdef <- g$cc$n - sum(table(g$cc$id)==1)  # rankdef should be the number of cc with size>1, but ask to H
       cc.id <- g$cc$id
     }  else stop("igmrf.type not supported; it can only be 'rw1', 'rw2' or 'besag'")
   }
