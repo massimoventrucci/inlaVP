@@ -1,7 +1,7 @@
 # inlaVP
 
 This package contains functions to fit Variance Partiotioning (VP) disease mapping models in R-INLA; these models are described in the paper by 
-Franco-Villoria M et al. (2021), where a new approach to model space-time interactions is presented. One relevant application concerns spatio-temporal disease mapping. 
+Franco-Villoria M et al. (2021) presenting a new approach to model space-time data. The main idea is to parametrize space-time interaction models in a way that the contribution of space, time and their interaction can be quantified. One relevant application is spatio-temporal disease mapping. 
 But, in general, the proposed models may be adopted in all those applications where intrinsic GMRFs are meant as tools to perform smoothing in more than one dimension; 
 for instance in the analysis of grid-data such as those arising from agricultural field trials or spatio-temporal data from environmental studies and ecological surveys.
 
