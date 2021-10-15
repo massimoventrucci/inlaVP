@@ -207,7 +207,7 @@ constr.interaction <- function(m1, m2, interaction.type){
 
   n1 <- ncol(m1$R)
   n2 <- ncol(m2$R)
-  if (is.null(m2$cc.id)) {
+  if (is.null(m2$cc.id) | sum(m2$cc.id)==n2) {
     # m2 is either ICAR with a fully connected graph or a RW
     f2.inter.const <- kronecker(matrix(1,ncol=n2),diag(n1)) # for each time point, sum-to-zero over space locations
     f1.inter.const <- kronecker(diag(n2),matrix(1,ncol=n1)) # for each space location, sum-to-zero over time points
