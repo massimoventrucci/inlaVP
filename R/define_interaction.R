@@ -3,100 +3,111 @@
 # it is used to define the main effects, e.g. f1=m(x1, "rw2")
 # NOTE: x values must be increasing (THOUGH they can be unequally spaced...)
 
+###########  ########### ########### utilities
+define.id <- function(x){
+  n <- length(x)
+  x0 <- unique(x)
+  id.x0 <- rank(x0)#order(x0)
+  # find the duplicated and assign the rank to them
+  id <- rep(NA, n)
+  id.dupl <- duplicated(x)
+  if (sum(id.dupl)>0){
+    id[!id.dupl] <- rank(x[!id.dupl])# order(x[!id.dupl])
+    x.dupl <- x[duplicated(x)]
+    dictionary.id <- cbind(x0, id.x0)
+    for( j in 1:length(x.dupl)) {
+      val <- x.dupl[j]
+      id.tmp <- which(val == dictionary.id[,1])
+      id[which(id.dupl)[j]] <- as.numeric(dictionary.id[id.tmp,2])#as.numeric(dictionary.id[which(x0==val),2])
+    }
+  } else {
+    id <- id.x0
+  }
+  id
+}
+
+build.A <- function(id, n, p) {
+  A <- matrix(0, nrow=n, ncol=p)
+  for(i in 1:n){
+    A[i,id[i]] <- 1
+  }
+  return(A)
+}
+
+Qrw2 <- function(x) {
+  xx <-  sort(unique(x))
+  n <- length(xx)
+  if(all(diff(xx)==1))
+  {
+    Qrw <- INLA:::inla.rw(n, order = 2, scale.model=TRUE)
+  }else{
+    # structure rw2 for irregularly locations
+    Qrw <- INLA:::inla.extract.Q("xx", y ~ f(xx, model="rw2",scale.model=TRUE,
+                                             initial=0, diagonal = 0, fixed=T),
+                                 data = data.frame(xx, y = rep(0, length(xx))))
+  }
+  return(Qrw)
+}
+
+Qrw1 <- function(x) {
+  xx <-  sort(unique(x))
+  n <- length(xx)
+  if(all(diff(xx)==1))
+  {
+    Qrw <- INLA:::inla.rw(n, order = 1, scale.model=TRUE)
+  }else{
+    # structure rw1 for irregularly locations
+    Qrw <- INLA:::inla.extract.Q("xx", y ~ f(xx, model="rw1",scale.model=TRUE,
+                                             initial=0, diagonal = 0, fixed=T),
+                                 data = data.frame(xx, y = rep(0, length(xx))))
+  }
+  return(Qrw)
+}
+
+Qbesag <- function(graph){
+  # xx <- sort(unique(x))
+  # n <- length(xx)
+  # Q <- INLA:::inla.extract.Q("xx", y ~ f(xx,
+  #                                        model = "besag",
+  #                                        graph = graph,
+  #                                        scale.model = TRUE,
+  #                                        adjust.for.con.comp = TRUE,
+  #                                        initial=0, diagonal = 0,
+  #                                        fixed = TRUE),
+  #                            data = data.frame(xx, y = rep(0, n)))
+  # graph.mat <- INLA::inla.as.sparse(INLA::inla.graph2matrix(g))
+  # R.tmp <- -graph.mat
+  # diag(R.tmp) <- apply(graph.mat,1,sum)-1
+  # R <- INLA::inla.scale.model(R.tmp,
+  #                             constr = list(
+  #                               A = matrix(1, 1, nrow(graph.mat)),
+  #                               e=0))
+  Q.tmp <- - INLA:::inla.as.sparse(inla.graph2matrix(graph))
+  diag(Q.tmp) <- 0
+  diag(Q.tmp) <- - Matrix:::rowSums(Q.tmp)
+  n <- dim(Q.tmp)[1]
+  Q <- INLA:::inla.scale.model(Q.tmp, constr = list(A = matrix(1, 1, n), e=0))
+  return(Q)
+}
+
+bspline <- function(x, xl=min(x), xr=max(x), ndx, bdeg) {
+  dx <- (xr - xl) / ndx
+  knots <- seq(xl - bdeg * dx, xr + bdeg * dx, by = dx)
+  B <- splines::spline.des(knots, x, bdeg + 1, 0 * x, outer.ok = TRUE)$design
+  B
+}
+
+###########  ########### ########### END utilities
+
 
 # x: covariate
 # igmrf.type: the main effect model, e.g. "rw2", "besag"
 # R: optional; the structure matrix defined through an inla obj 'Cmatrix'
 # g: for 'besag' only; the structure matrix defined through an inla obj 'graph'
 
-m <- function(x, igmrf.type = "rw1", R=NULL, g,
+m <- function(x, igmrf.type = "rw1",
+              R=NULL, g,
               p.spline=FALSE, n.bsplines=20, deg.bsplines=3){
-
-  ###########  ########### ########### utilities
-  define.id <- function(x){
-    n <- length(x)
-    x0 <- unique(x)
-    id.x0 <- rank(x0)#order(x0)
-    # find the duplicated and assign the rank to them
-    id <- rep(NA, n)
-    id.dupl <- duplicated(x)
-    if (sum(id.dupl)>0){
-      id[!id.dupl] <- rank(x[!id.dupl])# order(x[!id.dupl])
-      x.dupl <- x[duplicated(x)]
-      dictionary.id <- cbind(x0, id.x0)
-      for( j in 1:length(x.dupl)) {
-        val <- x.dupl[j]
-        id.tmp <- which(val == dictionary.id[,1])
-        id[which(id.dupl)[j]] <- as.numeric(dictionary.id[id.tmp,2])#as.numeric(dictionary.id[which(x0==val),2])
-      }
-    } else {
-      id <- id.x0
-    }
-    id
-  }
-
-  build.A <- function(id, n, p) {
-    A <- matrix(0, nrow=n, ncol=p)
-    for(i in 1:n){
-      A[i,id[i]] <- 1
-    }
-    return(A)
-  }
-
-  Qrw2 <- function(x) {
-    xx <-  sort(unique(x))
-    n <- length(xx)
-    if(all(diff(xx)==1))
-    {
-      Qrw <- INLA:::inla.rw(n, order = 2, scale.model=TRUE)
-    }else{
-      # structure rw2 for irregularly locations
-      Qrw <- INLA:::inla.extract.Q("xx", y ~ f(xx, model="rw2",scale.model=TRUE,
-                                               initial=0, diagonal = 0, fixed=T),
-                                   data = data.frame(xx, y = rep(0, length(xx))))
-    }
-    return(Qrw)
-  }
-
-  Qrw1 <- function(x) {
-    xx <-  sort(unique(x))
-    n <- length(xx)
-    if(all(diff(xx)==1))
-    {
-      Qrw <- INLA:::inla.rw(n, order = 1, scale.model=TRUE)
-    }else{
-      # structure rw1 for irregularly locations
-      Qrw <- INLA:::inla.extract.Q("xx", y ~ f(xx, model="rw1",scale.model=TRUE,
-                                               initial=0, diagonal = 0, fixed=T),
-                                   data = data.frame(xx, y = rep(0, length(xx))))
-    }
-    return(Qrw)
-  }
-
-  Qbesag <- function(x, graph){
-    xx <- sort(unique(x))
-    n <- length(xx)
-    Q <- INLA:::inla.extract.Q("xx", y ~ f(xx,
-                                           model="besag",
-                                           graph=graph,
-                                           scale.model=TRUE,
-                                           adjust.for.con.comp =TRUE,
-                                           initial=0, diagonal = 0,
-                                           fixed=TRUE),
-                               data = data.frame(xx, y = rep(0, n)))
-    return(Q)
-  }
-
-  bspline <- function(x, xl=min(x), xr=max(x), ndx, bdeg) {
-    dx <- (xr - xl) / ndx
-    knots <- seq(xl - bdeg * dx, xr + bdeg * dx, by = dx)
-    B <- splines::spline.des(knots, x, bdeg + 1, 0 * x, outer.ok = TRUE)$design
-    B
-  }
-
-  ###########  ########### ########### END utilities
-
-
   if (p.spline & igmrf.type == "besag") {
     stop("p-spline is not available for igmrf.type = 'besag'")
   } else if (p.spline & igmrf.type != "besag") {
@@ -126,19 +137,9 @@ m <- function(x, igmrf.type = "rw1", R=NULL, g,
       rankdef <- 2
       cc.id <- NULL
     } else if (igmrf.type == "besag") {
-      # old
-      # graph.mat <- INLA::inla.as.sparse(INLA::inla.graph2matrix(g))
-      # R.tmp <- -graph.mat
-      # diag(R.tmp) <- apply(graph.mat,1,sum)-1
-      # R <- INLA::inla.scale.model(R.tmp,
-      #                             constr = list(
-      #                               A = matrix(1, 1, nrow(graph.mat)),
-      #                               e=0))
-      # rankdef <- 1
-      # END old
-      R <- Qbesag(x=x, graph=g)
+      R <- Qbesag(g)
       rankdef <- g$cc$n - sum(table(g$cc$id)==1)  # rankdef should be the number of cc with size>1, but ask to H
-      cc.id <- g$cc$id
+      cc.id <- g$cc$id  # rankdef <- 1 # old version, think about it
     }  else stop("igmrf.type not supported; it can only be 'rw1', 'rw2' or 'besag'")
   }
 
